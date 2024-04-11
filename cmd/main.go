@@ -38,10 +38,15 @@ func main() {
 		}
 	}(que)
 
-	handler := app.NewHandler(storage)
-	asyncHandler := app.NewAsyncHandler(que, storage)
+	cache := app.NewRedisClient(conf.RedisHost)
+	if err != nil {
+		log.Fatalf("failed to create cache: %v", err)
+	}
 
-	webhookProcessor := app.NewWebhookProcessor(storage, que)
+	handler := app.NewHandler(storage)
+	asyncHandler := app.NewAsyncHandler(que, storage, cache)
+
+	webhookProcessor := app.NewWebhookProcessor(storage, que, cache)
 	go webhookProcessor.ProcessWebhooks()
 
 	http.HandleFunc("/webhook", handler.HandleWebhook)

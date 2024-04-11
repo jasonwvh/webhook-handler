@@ -8,10 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/jasonwvh/webhook-handler/internal/models"
-
 	"github.com/jasonwvh/webhook-handler/internal/app"
 	"github.com/jasonwvh/webhook-handler/internal/config"
+	"github.com/jasonwvh/webhook-handler/internal/models"
 	"github.com/jasonwvh/webhook-handler/internal/queue"
 )
 
@@ -36,7 +35,9 @@ func TestAsyncMain(t *testing.T) {
 	}
 	defer que.Close()
 
-	handler := app.NewAsyncHandler(que, storage)
+	cache := app.NewRedisClient(conf.RedisHost)
+
+	handler := app.NewAsyncHandler(que, storage, cache)
 
 	// Create a test server
 	server := httptest.NewServer(http.HandlerFunc(handler.HandleWebhook))

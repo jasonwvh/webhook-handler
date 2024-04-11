@@ -36,8 +36,7 @@ func (s *SQLiteStorage) GetWorkItem(ctx context.Context, id int) (*models.WorkIt
 	var url string
 	err := s.db.QueryRow("SELECT * FROM work_items WHERE id = ?", id).Scan(&id, &url)
 	if err != nil {
-		log.Printf("%v", err)
-		return &models.WorkItem{}, err
+		return nil, err
 	}
 
 	return &models.WorkItem{ID: id, URL: url}, nil

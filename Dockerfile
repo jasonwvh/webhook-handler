@@ -16,6 +16,7 @@ WORKDIR /
 
 COPY --from=builder /server /server
 
+ENV REDIS_HOST=redis
 ENV RABBITMQ_HOST=rabbitmq
 ENV RABBITMQ_USER=user
 ENV RABBITMQ_PASSWORD=password

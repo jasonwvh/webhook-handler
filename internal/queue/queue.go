@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/jasonwvh/webhook-handler/internal/models"
 	"github.com/rabbitmq/amqp091-go"
@@ -55,8 +54,8 @@ func (q *RabbitMQQueue) Publish(ctx context.Context, workItem models.WorkItem) e
 	return q.ch.PublishWithContext(ctx,
 		"",       // exchange
 		q.q.Name, // routing key
-		false,    // mandatory
-		false,    // immediate
+		true,     // mandatory
+		true,     // immediate
 		amqp091.Publishing{
 			ContentType: "application/json",
 			Body:        payload,
@@ -67,22 +66,16 @@ func (q *RabbitMQQueue) Receive(ctx context.Context) (models.WorkItem, error) {
 	msgs, err := q.ch.ConsumeWithContext(ctx,
 		q.q.Name, // queue
 		"",       // consumer
-		false,    // auto-ack
-		false,    // exclusive
-		false,    // no-local
-		false,    // no-wait
+		true,     // auto-ack
+		true,     // exclusive
+		true,     // no-local
+		true,     // no-wait
 		nil,      // args
 	)
 
 	if err != nil {
 		return models.WorkItem{}, err
 	}
-
-	go func() {
-		for d := range msgs {
-			log.Printf("received a message: %s", d.Body)
-		}
-	}()
 
 	data := <-msgs
 	var workItem models.WorkItem

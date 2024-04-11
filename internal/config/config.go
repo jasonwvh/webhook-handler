@@ -5,6 +5,7 @@ import (
 )
 
 type Config struct {
+	RedisHost        string
 	RabbitMQHost     string
 	RabbitMQUser     string
 	RabbitMQPassword string
@@ -12,12 +13,14 @@ type Config struct {
 }
 
 func LoadConfig() (*Config, error) {
+	redisHost := getEnvOrDefault("REDIS_HOST", "localhost")
 	rabbitMQHost := getEnvOrDefault("RABBITMQ_HOST", "localhost")
 	rabbitMQUser := getEnvOrDefault("RABBITMQ_USER", "user")
 	rabbitMQPassword := getEnvOrDefault("RABBITMQ_PASSWORD", "password")
-	sqliteDBPath := getEnvOrDefault("SQLITE_DB_PATH", "./data/webhook.db")
+	sqliteDBPath := getEnvOrDefault("SQLITE_DB_PATH", "../data/app.db")
 
 	return &Config{
+		RedisHost:        redisHost,
 		RabbitMQHost:     rabbitMQHost,
 		RabbitMQUser:     rabbitMQUser,
 		RabbitMQPassword: rabbitMQPassword,
