@@ -16,8 +16,8 @@ WORKDIR /
 
 COPY --from=builder /server /server
 
-ENV REDIS_HOST=redis
-ENV RABBITMQ_HOST=rabbitmq
+ENV REDIS_HOST=localhost
+ENV RABBITMQ_HOST=localhost
 ENV RABBITMQ_USER=user
 ENV RABBITMQ_PASSWORD=password
 ENV SQLITE_DB_PATH=/data/app.db/

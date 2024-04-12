@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"database/sql"
 	"log"
 
@@ -32,7 +31,7 @@ func NewSQLiteStorage(dbPath string) (*SQLiteStorage, error) {
 	return &SQLiteStorage{db: db}, nil
 }
 
-func (s *SQLiteStorage) GetWorkItem(ctx context.Context, id int) (*models.WorkItem, error) {
+func (s *SQLiteStorage) GetWorkItem(id int) (*models.WorkItem, error) {
 	var url string
 	err := s.db.QueryRow("SELECT * FROM work_items WHERE id = ?", id).Scan(&id, &url)
 	if err != nil {
@@ -42,7 +41,7 @@ func (s *SQLiteStorage) GetWorkItem(ctx context.Context, id int) (*models.WorkIt
 	return &models.WorkItem{ID: id, URL: url}, nil
 }
 
-func (s *SQLiteStorage) StoreWorkItem(ctx context.Context, workItem models.WorkItem) error {
+func (s *SQLiteStorage) StoreWorkItem(workItem *models.WorkItem) error {
 	statement, err := s.db.Prepare("INSERT INTO work_items (id, url) VALUES (?, ?)")
 	if err != nil {
 		log.Fatal(err)

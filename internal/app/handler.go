@@ -1,10 +1,9 @@
 package app
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/jasonwvh/webhook-handler/internal/models"
@@ -12,11 +11,13 @@ import (
 
 type Handler struct {
 	storage *SQLiteStorage
+	cache   *RedisClient
 }
 
-func NewHandler(storage *SQLiteStorage) *Handler {
+func NewHandler(storage *SQLiteStorage, cache *RedisClient) *Handler {
 	return &Handler{
 		storage: storage,
+		cache:   cache,
 	}
 }
 
@@ -27,7 +28,21 @@ func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.processWorkItem(r.Context(), workItem); err != nil {
+	if val, _ := h.storage.GetWorkItem(workItem.ID); val != nil {
+		http.Error(w, "work item already processed", http.StatusConflict)
+
+		h.cache.RemoveKey(strconv.Itoa(workItem.ID))
+		return
+	}
+
+	if val, _ := h.cache.GetValue(strconv.Itoa(workItem.ID)); val == "pending" {
+		http.Error(w, "work item already pending", http.StatusConflict)
+		return
+	}
+
+	h.cache.SetValue(strconv.Itoa(workItem.ID), "pending")
+
+	if err := h.processWorkItem(&workItem); err != nil {
 		http.Error(w, "failed to process work item", http.StatusInternalServerError)
 		return
 	}
@@ -35,12 +50,10 @@ func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) processWorkItem(ctx context.Context, workItem models.WorkItem) error {
-	if _, err := h.storage.GetWorkItem(context.Background(), workItem.ID); err == nil {
-		return fmt.Errorf("work item already processed")
-	}
-
+func (h *Handler) processWorkItem(workItem *models.WorkItem) error {
 	// Simulate work
 	time.Sleep(time.Second)
-	return h.storage.StoreWorkItem(ctx, workItem)
+
+	h.cache.RemoveKey(strconv.Itoa(workItem.ID))
+	return h.storage.StoreWorkItem(workItem)
 }

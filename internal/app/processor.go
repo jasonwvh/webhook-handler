@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -37,16 +36,10 @@ func (p *WebhookProcessor) ProcessWebhooks() {
 		}
 
 		p.executor.Submit(func() {
-			if err := p.processWorkItem(context.Background(), workItem); err != nil {
+			if err := p.processWorkItem(workItem); err != nil {
 				log.Printf("failed to process work item: %v", err)
 				return
 			}
-
-			// workItemString, err := json.Marshal(workItem)
-			// if err != nil {
-			// 	log.Printf("unable to marshal work item")
-			// 	return
-			// }
 
 			if err := p.cache.RemoveKey(strconv.Itoa(workItem.ID)); err != nil {
 				log.Printf("failed to delete pending item: %v", err)
@@ -56,12 +49,9 @@ func (p *WebhookProcessor) ProcessWebhooks() {
 	}
 }
 
-func (p *WebhookProcessor) processWorkItem(ctx context.Context, workItem models.WorkItem) error {
-	if _, err := p.storage.GetWorkItem(context.Background(), workItem.ID); err == nil {
-		return fmt.Errorf("work item already processed")
-	}
-
+func (p *WebhookProcessor) processWorkItem(workItem *models.WorkItem) error {
 	// Simulate work
 	time.Sleep(time.Second)
-	return p.storage.StoreWorkItem(ctx, workItem)
+
+	return p.storage.StoreWorkItem(workItem)
 }

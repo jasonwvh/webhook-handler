@@ -9,7 +9,6 @@ import (
 	"github.com/jasonwvh/webhook-handler/internal/queue"
 )
 
-// In main.go
 func main() {
 	conf, err := config.LoadConfig()
 	if err != nil {
@@ -39,11 +38,8 @@ func main() {
 	}(que)
 
 	cache := app.NewRedisClient(conf.RedisHost)
-	if err != nil {
-		log.Fatalf("failed to create cache: %v", err)
-	}
 
-	handler := app.NewHandler(storage)
+	handler := app.NewHandler(storage, cache)
 	asyncHandler := app.NewAsyncHandler(que, storage, cache)
 
 	webhookProcessor := app.NewWebhookProcessor(storage, que, cache)

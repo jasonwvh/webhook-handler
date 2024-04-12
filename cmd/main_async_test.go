@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -20,20 +21,30 @@ func TestAsyncMain(t *testing.T) {
 		RabbitMQHost:     "localhost",
 		RabbitMQUser:     "user",
 		RabbitMQPassword: "password",
-		SQLiteDBPath:     "test.db",
+		SQLiteDBPath:     "../data/test.db",
 	}
 
 	storage, err := app.NewSQLiteStorage(conf.SQLiteDBPath)
 	if err != nil {
-		t.Fatalf("failed to create storage: %v", err)
+		log.Fatalf("failed to create storage: %v", err)
 	}
-	defer storage.Close()
+	defer func(storage *app.SQLiteStorage) {
+		err := storage.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(storage)
 
 	que, err := queue.NewRabbitMQQueue(conf.RabbitMQHost, conf.RabbitMQUser, conf.RabbitMQPassword)
 	if err != nil {
-		t.Fatalf("failed to create queue: %v", err)
+		log.Fatalf("failed to create queue: %v", err)
 	}
-	defer que.Close()
+	defer func(q *queue.RabbitMQQueue) {
+		err := q.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(que)
 
 	cache := app.NewRedisClient(conf.RedisHost)
 

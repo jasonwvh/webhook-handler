@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/jasonwvh/webhook-handler/internal/models"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/jasonwvh/webhook-handler/internal/app"
 	"github.com/jasonwvh/webhook-handler/internal/config"
+	"github.com/jasonwvh/webhook-handler/internal/models"
 	"github.com/jasonwvh/webhook-handler/internal/queue"
 )
 
@@ -20,22 +21,34 @@ func TestSyncMain(t *testing.T) {
 		RabbitMQHost:     "localhost",
 		RabbitMQUser:     "user",
 		RabbitMQPassword: "password",
-		SQLiteDBPath:     "test.db",
+		SQLiteDBPath:     "../data/test.db",
 	}
 
 	storage, err := app.NewSQLiteStorage(conf.SQLiteDBPath)
 	if err != nil {
-		t.Fatalf("failed to create storage: %v", err)
+		log.Fatalf("failed to create storage: %v", err)
 	}
-	defer storage.Close()
+	defer func(storage *app.SQLiteStorage) {
+		err := storage.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(storage)
 
-	queue, err := queue.NewRabbitMQQueue(conf.RabbitMQHost, conf.RabbitMQUser, conf.RabbitMQPassword)
+	que, err := queue.NewRabbitMQQueue(conf.RabbitMQHost, conf.RabbitMQUser, conf.RabbitMQPassword)
 	if err != nil {
-		t.Fatalf("failed to create queue: %v", err)
+		log.Fatalf("failed to create queue: %v", err)
 	}
-	defer queue.Close()
+	defer func(q *queue.RabbitMQQueue) {
+		err := q.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(que)
 
-	handler := app.NewHandler(storage)
+	cache := app.NewRedisClient(conf.RedisHost)
+
+	handler := app.NewHandler(storage, cache)
 
 	// Create a test server
 	server := httptest.NewServer(http.HandlerFunc(handler.HandleWebhook))

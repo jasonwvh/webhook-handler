@@ -54,36 +54,36 @@ func (q *RabbitMQQueue) Publish(ctx context.Context, workItem models.WorkItem) e
 	return q.ch.PublishWithContext(ctx,
 		"",       // exchange
 		q.q.Name, // routing key
-		true,     // mandatory
-		true,     // immediate
+		false,    // mandatory
+		false,    // immediate
 		amqp091.Publishing{
 			ContentType: "application/json",
 			Body:        payload,
 		})
 }
 
-func (q *RabbitMQQueue) Receive(ctx context.Context) (models.WorkItem, error) {
+func (q *RabbitMQQueue) Receive(ctx context.Context) (*models.WorkItem, error) {
 	msgs, err := q.ch.ConsumeWithContext(ctx,
 		q.q.Name, // queue
 		"",       // consumer
 		true,     // auto-ack
-		true,     // exclusive
-		true,     // no-local
-		true,     // no-wait
+		false,    // exclusive
+		false,    // no-local
+		false,    // no-wait
 		nil,      // args
 	)
 
 	if err != nil {
-		return models.WorkItem{}, err
+		return nil, err
 	}
 
 	data := <-msgs
 	var workItem models.WorkItem
 	if err := json.Unmarshal(data.Body, &workItem); err != nil {
-		return models.WorkItem{}, err
+		return nil, err
 	}
 
-	return workItem, nil
+	return &workItem, nil
 }
 
 func (q *RabbitMQQueue) Close() error {
