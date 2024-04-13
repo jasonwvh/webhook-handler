@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"log"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -52,6 +53,13 @@ func (p *WebhookProcessor) ProcessWebhooks() {
 func (p *WebhookProcessor) processWorkItem(workItem *models.WorkItem) error {
 	// Simulate work
 	time.Sleep(time.Second)
+
+	resp, err := http.Get(workItem.URL)
+	if err != nil {
+		log.Printf("Error processing work item %d: %v\n", workItem.ID, err)
+		return err
+	}
+	resp.Body.Close()
 
 	return p.storage.StoreWorkItem(workItem)
 }

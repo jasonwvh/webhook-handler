@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -53,6 +54,13 @@ func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) processWorkItem(workItem *models.WorkItem) error {
 	// Simulate work
 	time.Sleep(time.Second)
+
+	resp, err := http.Get(workItem.URL)
+	if err != nil {
+		log.Printf("Error processing work item %d: %v\n", workItem.ID, err)
+		return err
+	}
+	resp.Body.Close()
 
 	h.cache.RemoveKey(strconv.Itoa(workItem.ID))
 	return h.storage.StoreWorkItem(workItem)
