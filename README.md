@@ -3,7 +3,7 @@
 ### Starting the services
 
 ```
-docker compose up
+docker compose up --build
 ```
 
 ### Using the service
