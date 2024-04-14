@@ -2,9 +2,9 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/jasonwvh/webhook-handler/internal/models"
@@ -25,43 +25,80 @@ func NewHandler(storage *SQLiteStorage, cache *RedisClient) *Handler {
 func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	var workItem models.WorkItem
 	if err := json.NewDecoder(r.Body).Decode(&workItem); err != nil {
-		http.Error(w, "invalid work item", http.StatusBadRequest)
+		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
-	if val, _ := h.storage.GetWorkItem(workItem.ID); val != nil {
-		http.Error(w, "work item already processed", http.StatusConflict)
-
-		h.cache.RemoveKey(strconv.Itoa(workItem.ID))
+	if err := h.validateWorkItem(&workItem); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-
-	if val, _ := h.cache.GetValue(strconv.Itoa(workItem.ID)); val == "pending" {
-		http.Error(w, "work item already pending", http.StatusConflict)
-		return
-	}
-
-	h.cache.SetValue(strconv.Itoa(workItem.ID), "pending")
 
 	if err := h.processWorkItem(&workItem); err != nil {
-		http.Error(w, "failed to process work item", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) processWorkItem(workItem *models.WorkItem) error {
-	// Simulate work
-	time.Sleep(time.Second)
+func (h *Handler) validateWorkItem(workItem *models.WorkItem) error {
+	item, _ := h.storage.GetWorkItem(workItem.ID)
+	if item != nil {
+		err := h.cache.RemovePending(workItem.ID)
+		if err != nil {
+			return err
+		}
 
+		if workItem.Seq != item.Seq+1 {
+			// if the url is already processed and it's not the next sequence
+			return fmt.Errorf("work item not next in order")
+		}
+		return fmt.Errorf("work item is processed")
+	}
+
+	if pending := h.cache.IsPending(workItem.ID); pending {
+		return fmt.Errorf("work item is processing")
+	}
+
+	return nil
+}
+
+func (h *Handler) processWorkItem(workItem *models.WorkItem) error {
+	seq, err := h.cache.GetSeq(workItem.URL)
+	if err != nil {
+		// if url doesn't exist yet, create one
+		log.Printf("seq: %d", seq)
+		err := h.cache.SetSeq(workItem.URL, 0)
+		if err != nil {
+			log.Printf("couldn't set seq: %v", err)
+		}
+	}
+	if workItem.Seq != seq+1 {
+		// if the url is already processed and it's not the next sequence
+		return fmt.Errorf("work item not next in order")
+	}
+	err = h.cache.AddPending(workItem.ID)
+	if err != nil {
+		return err
+	}
+
+	// simulate work
+	time.Sleep(time.Second)
 	resp, err := http.Get(workItem.URL)
 	if err != nil {
-		log.Printf("Error processing work item %d: %v\n", workItem.ID, err)
 		return err
 	}
 	resp.Body.Close()
 
-	h.cache.RemoveKey(strconv.Itoa(workItem.ID))
+	err = h.cache.RemovePending(workItem.ID)
+	if err != nil {
+		return err
+	}
+	err = h.cache.SetSeq(workItem.URL, workItem.Seq)
+	if err != nil {
+		return err
+	}
+
 	return h.storage.StoreWorkItem(workItem)
 }

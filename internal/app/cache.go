@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -23,26 +24,38 @@ func NewRedisClient(host string) *RedisClient {
 	}
 }
 
-func (r *RedisClient) SetValue(key string, value interface{}) error {
+func (r *RedisClient) AddPending(id int) error {
+	return r.client.SAdd(r.ctx, "pending", id).Err()
+}
+
+func (r *RedisClient) IsPending(id int) bool {
+	return r.client.SIsMember(r.ctx, "pending", id).Val()
+}
+
+func (r *RedisClient) RemovePending(id int) error {
+	return r.client.SRem(r.ctx, "pending", id).Err()
+}
+
+func (r *RedisClient) SetSeq(key string, value interface{}) error {
 	err := r.client.Set(r.ctx, key, value, 60*time.Second).Err()
 	if err != nil {
-		return fmt.Errorf("failed to set value: %w", err)
+		log.Printf("failed to set value: %w", err)
 	}
 	return nil
 }
 
-func (r *RedisClient) GetValue(key string) (string, error) {
-	val, err := r.client.Get(r.ctx, key).Result()
+func (r *RedisClient) GetSeq(key string) (int, error) {
+	val, err := r.client.Get(r.ctx, key).Int()
 	if err != nil {
-		return "", fmt.Errorf("failed to get value: %w", err)
+		log.Printf("failed to get value: %w", err)
 	}
 	return val, nil
 }
 
-func (r *RedisClient) RemoveKey(key string) error {
+func (r *RedisClient) RemoveSeq(key string) error {
 	err := r.client.Del(r.ctx, key).Err()
 	if err != nil {
-		return fmt.Errorf("failed to remove key: %w", err)
+		log.Printf("failed to del value: %w", err)
 	}
 	return nil
 }
