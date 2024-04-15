@@ -39,8 +39,8 @@ func (r *RedisClient) SetSeq(key string, value interface{}) error {
 	return r.client.Set(r.ctx, key, value, 60*time.Second).Err()
 }
 
-func (r *RedisClient) GetSeq(key string) (int, error) {
-	return r.client.Get(r.ctx, key).Int()
+func (r *RedisClient) GetSeq(key string) (string, error) {
+	return r.client.Get(r.ctx, key).Result()
 }
 
 func (r *RedisClient) RemoveSeq(key string) error {

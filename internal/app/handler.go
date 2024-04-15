@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/jasonwvh/webhook-handler/internal/models"
@@ -63,11 +64,15 @@ func (h *Handler) processWorkItem(workItem *models.WorkItem) error {
 	seq, err := h.cache.GetSeq(workItem.URL)
 	if err != nil {
 		// if url doesn't exist yet, create one
-		h.cache.SetSeq(workItem.URL, 0)
+		err = h.cache.SetSeq(workItem.URL, 0)
+		if err != nil {
+			return fmt.Errorf("cannot set seq")
+		}
 	}
-	if workItem.Seq != seq+1 {
+	seqInt, _ := strconv.Atoi(seq)
+	if err == nil && workItem.Seq != seqInt+1 {
 		// if the url is already processed and it's not the next sequence
-		return fmt.Errorf("work item not next in order")
+		return fmt.Errorf("work item not next in order, workItem.Seq: %v, seq+1: %v", workItem.Seq, seqInt+1)
 	}
 	h.cache.AddPending(workItem.ID)
 

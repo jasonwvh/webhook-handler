@@ -26,6 +26,19 @@ func NewRabbitMQQueue(host, user, password string) (*RabbitMQQueue, error) {
 		return nil, err
 	}
 
+	// err = ch.ExchangeDeclare(
+	// 	"webhookx", // name
+	// 	"fanout",   // type
+	// 	true,       // durable
+	// 	false,      // auto-deleted
+	// 	false,      // internal
+	// 	false,      // no-wait
+	// 	nil,        // arguments
+	// )
+	// if err != nil {
+	// 	panic(err)
+	// }
+
 	q, err := ch.QueueDeclare(
 		"webhook_queue", // name
 		true,            // durable
@@ -37,6 +50,17 @@ func NewRabbitMQQueue(host, user, password string) (*RabbitMQQueue, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// err = ch.QueueBind(
+	// 	q.Name,     // queue name
+	// 	"",         // routing key
+	// 	"webhookx", // exchange
+	// 	false,
+	// 	nil,
+	// )
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	return &RabbitMQQueue{
 		conn: conn,
@@ -62,11 +86,11 @@ func (q *RabbitMQQueue) Publish(ctx context.Context, workItem models.WorkItem) e
 		})
 }
 
-func (q *RabbitMQQueue) Receive(ctx context.Context) (*models.WorkItem, error) {
+func (q *RabbitMQQueue) Receive(ctx context.Context) (<-chan amqp091.Delivery, error) {
 	msgs, err := q.ch.ConsumeWithContext(ctx,
 		q.q.Name, // queue
 		"",       // consumer
-		true,     // auto-ack
+		false,    // auto-ack
 		false,    // exclusive
 		false,    // no-local
 		false,    // no-wait
@@ -77,13 +101,7 @@ func (q *RabbitMQQueue) Receive(ctx context.Context) (*models.WorkItem, error) {
 		return nil, err
 	}
 
-	data := <-msgs
-	var workItem models.WorkItem
-	if err := json.Unmarshal(data.Body, &workItem); err != nil {
-		return nil, err
-	}
-
-	return &workItem, nil
+	return msgs, nil
 }
 
 func (q *RabbitMQQueue) Close() error {
