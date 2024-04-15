@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/jasonwvh/webhook-handler/internal/models"
@@ -27,50 +26,32 @@ func NewAsyncHandler(queue *queue.RabbitMQQueue, storage *SQLiteStorage, cache *
 func (h *AsyncHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	var workItem models.WorkItem
 	if err := json.NewDecoder(r.Body).Decode(&workItem); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
-		return
-	}
-	// todo: seq checker should be here
-
-	if err := h.validateWorkItem(&workItem); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, "invalid work item", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.enqueueWorkItem(r.Context(), &workItem); err != nil {
-		http.Error(w, "failed to queue work item", http.StatusInternalServerError)
+	if val, _ := h.storage.GetWorkItem(workItem.ID); val != nil {
+		http.Error(w, "work item already processed", http.StatusConflict)
+
+		h.cache.RemovePending(workItem.ID)
+		return
+	}
+
+	if pending := h.cache.IsPending(workItem.ID); pending {
+		http.Error(w, "work item pending", http.StatusConflict)
+		return
+	}
+
+	h.cache.AddPending(workItem.ID)
+
+	if err := h.enqueueWorkItem(r.Context(), workItem); err != nil {
+		http.Error(w, "failed to enqueue work item", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *AsyncHandler) validateWorkItem(workItem *models.WorkItem) error {
-	item, _ := h.storage.GetWorkItem(workItem.ID)
-	if item != nil {
-		h.cache.RemovePending(workItem.ID)
-
-		return fmt.Errorf("work item is processed")
-	}
-
-	// todo: can just use db
-	//seq, err := h.cache.GetSeq(workItem.URL)
-	//if err != nil {
-	//	// if url doesn't exist yet, create one
-	//	log.Printf("seq: %d", seq)
-	//	err := h.cache.SetSeq(workItem.URL, 0)
-	//	if err != nil {
-	//		log.Printf("couldn't set seq: %v", err)
-	//	}
-	//}
-	//if workItem.Seq != seq+1 {
-	//	// if the url is already processed and it's not the next sequence
-	//	return fmt.Errorf("work item not next in order")
-	//}
-
-	return nil
-}
-
-func (h *AsyncHandler) enqueueWorkItem(ctx context.Context, workItem *models.WorkItem) error {
+func (h *AsyncHandler) enqueueWorkItem(ctx context.Context, workItem models.WorkItem) error {
 	return h.queue.Publish(ctx, workItem)
 }

@@ -45,7 +45,7 @@ func NewRabbitMQQueue(host, user, password string) (*RabbitMQQueue, error) {
 	}, nil
 }
 
-func (q *RabbitMQQueue) Publish(ctx context.Context, workItem *models.WorkItem) error {
+func (q *RabbitMQQueue) Publish(ctx context.Context, workItem models.WorkItem) error {
 	payload, err := json.Marshal(workItem)
 	if err != nil {
 		return err
@@ -72,11 +72,10 @@ func (q *RabbitMQQueue) Receive(ctx context.Context) (*models.WorkItem, error) {
 		false,    // no-wait
 		nil,      // args
 	)
+
 	if err != nil {
 		return nil, err
 	}
-
-	// return <-msgs, nil
 
 	data := <-msgs
 	var workItem models.WorkItem

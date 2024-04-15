@@ -3,7 +3,6 @@ package app
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -50,10 +49,6 @@ func (h *Handler) validateWorkItem(workItem *models.WorkItem) error {
 			return err
 		}
 
-		if workItem.Seq != item.Seq+1 {
-			// if the url is already processed and it's not the next sequence
-			return fmt.Errorf("work item not next in order")
-		}
 		return fmt.Errorf("work item is processed")
 	}
 
@@ -68,20 +63,13 @@ func (h *Handler) processWorkItem(workItem *models.WorkItem) error {
 	seq, err := h.cache.GetSeq(workItem.URL)
 	if err != nil {
 		// if url doesn't exist yet, create one
-		log.Printf("seq: %d", seq)
-		err := h.cache.SetSeq(workItem.URL, 0)
-		if err != nil {
-			log.Printf("couldn't set seq: %v", err)
-		}
+		h.cache.SetSeq(workItem.URL, 0)
 	}
 	if workItem.Seq != seq+1 {
 		// if the url is already processed and it's not the next sequence
 		return fmt.Errorf("work item not next in order")
 	}
-	err = h.cache.AddPending(workItem.ID)
-	if err != nil {
-		return err
-	}
+	h.cache.AddPending(workItem.ID)
 
 	// simulate work
 	time.Sleep(time.Second)
@@ -91,14 +79,8 @@ func (h *Handler) processWorkItem(workItem *models.WorkItem) error {
 	}
 	resp.Body.Close()
 
-	err = h.cache.RemovePending(workItem.ID)
-	if err != nil {
-		return err
-	}
-	err = h.cache.SetSeq(workItem.URL, workItem.Seq)
-	if err != nil {
-		return err
-	}
+	h.cache.RemovePending(workItem.ID)
+	h.cache.SetSeq(workItem.URL, workItem.Seq)
 
 	return h.storage.StoreWorkItem(workItem)
 }

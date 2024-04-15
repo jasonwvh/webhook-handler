@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -37,25 +36,13 @@ func (r *RedisClient) RemovePending(id int) error {
 }
 
 func (r *RedisClient) SetSeq(key string, value interface{}) error {
-	err := r.client.Set(r.ctx, key, value, 60*time.Second).Err()
-	if err != nil {
-		log.Printf("failed to set value: %w", err)
-	}
-	return nil
+	return r.client.Set(r.ctx, key, value, 60*time.Second).Err()
 }
 
 func (r *RedisClient) GetSeq(key string) (int, error) {
-	val, err := r.client.Get(r.ctx, key).Int()
-	if err != nil {
-		log.Printf("failed to get value: %w", err)
-	}
-	return val, nil
+	return r.client.Get(r.ctx, key).Int()
 }
 
 func (r *RedisClient) RemoveSeq(key string) error {
-	err := r.client.Del(r.ctx, key).Err()
-	if err != nil {
-		log.Printf("failed to del value: %w", err)
-	}
-	return nil
+	return r.client.Del(r.ctx, key).Err()
 }
