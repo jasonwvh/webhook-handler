@@ -64,7 +64,7 @@ func (h *Handler) processWorkItem(workItem *models.WorkItem) error {
 	seq, err := h.cache.GetSeq(workItem.URL)
 	if err != nil {
 		// if url doesn't exist yet, create one
-		err = h.cache.SetSeq(workItem.URL, 0)
+		err = h.cache.SetSeq(workItem.URL, workItem.Seq)
 		if err != nil {
 			return fmt.Errorf("cannot set seq")
 		}
@@ -72,7 +72,7 @@ func (h *Handler) processWorkItem(workItem *models.WorkItem) error {
 	seqInt, _ := strconv.Atoi(seq)
 	if err == nil && workItem.Seq != seqInt+1 {
 		// if the url is already processed and it's not the next sequence
-		return fmt.Errorf("work item not next in order, workItem.Seq: %v, seq+1: %v", workItem.Seq, seqInt+1)
+		return fmt.Errorf("work item not next in order")
 	}
 	h.cache.AddPending(workItem.ID)
 

@@ -26,18 +26,18 @@ func NewRabbitMQQueue(host, user, password string) (*RabbitMQQueue, error) {
 		return nil, err
 	}
 
-	// err = ch.ExchangeDeclare(
-	// 	"webhookx", // name
-	// 	"fanout",   // type
-	// 	true,       // durable
-	// 	false,      // auto-deleted
-	// 	false,      // internal
-	// 	false,      // no-wait
-	// 	nil,        // arguments
-	// )
-	// if err != nil {
-	// 	panic(err)
-	// }
+	err = ch.ExchangeDeclare(
+		"webhookx", // name
+		"fanout",   // type
+		true,       // durable
+		false,      // auto-deleted
+		false,      // internal
+		false,      // no-wait
+		nil,        // arguments
+	)
+	if err != nil {
+		panic(err)
+	}
 
 	q, err := ch.QueueDeclare(
 		"webhook_queue", // name
@@ -51,16 +51,16 @@ func NewRabbitMQQueue(host, user, password string) (*RabbitMQQueue, error) {
 		return nil, err
 	}
 
-	// err = ch.QueueBind(
-	// 	q.Name,     // queue name
-	// 	"",         // routing key
-	// 	"webhookx", // exchange
-	// 	false,
-	// 	nil,
-	// )
-	// if err != nil {
-	// 	panic(err)
-	// }
+	err = ch.QueueBind(
+		q.Name,     // queue name
+		"",         // routing key
+		"webhookx", // exchange
+		false,
+		nil,
+	)
+	if err != nil {
+		panic(err)
+	}
 
 	return &RabbitMQQueue{
 		conn: conn,
@@ -90,7 +90,7 @@ func (q *RabbitMQQueue) Receive(ctx context.Context) (<-chan amqp091.Delivery, e
 	msgs, err := q.ch.ConsumeWithContext(ctx,
 		q.q.Name, // queue
 		"",       // consumer
-		false,    // auto-ack
+		true,     // auto-ack
 		false,    // exclusive
 		false,    // no-local
 		false,    // no-wait

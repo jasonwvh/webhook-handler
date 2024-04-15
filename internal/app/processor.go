@@ -40,7 +40,7 @@ func (p *WebhookProcessor) ProcessWebhooks() {
 
 		go func() {
 			for d := range msgs {
-				log.Printf("Received a message: %s", d.Body)
+				// log.Printf("Received a message: %s", d.Body)
 
 				var workItem models.WorkItem
 				if err := json.Unmarshal(d.Body, &workItem); err != nil {
@@ -49,16 +49,15 @@ func (p *WebhookProcessor) ProcessWebhooks() {
 
 				p.executor.Submit(func() {
 					if err := p.processWorkItem(&workItem); err != nil {
-						log.Printf("failed to process work item: %v", err)
+						// log.Printf("failed to process work item: %v", err)
 
+						time.Sleep(2 * time.Second)
 						p.queue.Publish(context.Background(), workItem)
 						return
 					}
 
 					p.cache.RemovePending(workItem.ID)
 					p.cache.SetSeq(workItem.URL, workItem.Seq)
-
-					d.Ack(false)
 				})
 			}
 		}()
@@ -69,12 +68,12 @@ func (p *WebhookProcessor) processWorkItem(workItem *models.WorkItem) error {
 	seq, err := p.cache.GetSeq(workItem.URL)
 	if err != nil {
 		// if url doesn't exist yet, create one
-		p.cache.SetSeq(workItem.URL, 0)
+		p.cache.SetSeq(workItem.URL, workItem.Seq)
 	}
 	seqInt, _ := strconv.Atoi(seq)
 	if err == nil && workItem.Seq != seqInt+1 {
 		// if the url is already processed and it's not the next sequence
-		return fmt.Errorf("work item not next in order, workItem.Seq: %v, seq+1: %v", workItem.Seq, seqInt+1)
+		return fmt.Errorf("work item not next in order")
 	}
 	p.cache.AddPending(workItem.ID)
 
