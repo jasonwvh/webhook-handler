@@ -55,7 +55,7 @@ func TestSyncMain(t *testing.T) {
 	defer server.Close()
 
 	// Marshal the struct into JSON
-	body, err := json.Marshal(models.WorkItem{ID: 123, URL: "http://test.com"})
+	body, err := json.Marshal(models.WorkItem{ID: 101, URL: "http://google.com", Seq: 1})
 	if err != nil {
 		t.Errorf("Failed to marshal JSON: %v", err)
 		return

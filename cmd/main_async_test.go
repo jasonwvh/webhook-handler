@@ -55,14 +55,14 @@ func TestAsyncMain(t *testing.T) {
 	defer server.Close()
 
 	// Marshal the struct into JSON
-	body, err := json.Marshal(models.WorkItem{ID: 123, URL: "http://test.com"})
+	body, err := json.Marshal(models.WorkItem{ID: 201, URL: "http://yahoo.com", Seq: 1})
 	if err != nil {
 		t.Errorf("Failed to marshal JSON: %v", err)
 		return
 	}
 
 	// Test the webhook handler
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, server.URL+"/webhook", bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, server.URL+"/async-webhook", bytes.NewBuffer(body))
 	if err != nil {
 		t.Errorf("failed to create request: %v", err)
 	}
