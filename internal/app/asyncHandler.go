@@ -53,5 +53,5 @@ func (h *AsyncHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AsyncHandler) enqueueWorkItem(ctx context.Context, workItem models.WorkItem) error {
-	return h.queue.Publish(ctx, workItem)
+	return h.queue.Publish(ctx, workItem, 0)
 }

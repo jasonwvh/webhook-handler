@@ -34,27 +34,34 @@ func (p *WebhookProcessor) ProcessWebhooks() {
 	for {
 		msgs, err := p.queue.Receive(context.Background())
 		if err != nil {
-			log.Printf("failed to receive work item: %v", err)
 			continue
 		}
 
 		go func() {
 			for d := range msgs {
-				// log.Printf("Received a message: %s", d.Body)
-
 				var workItem models.WorkItem
 				if err := json.Unmarshal(d.Body, &workItem); err != nil {
 					continue
 				}
 
+				var retry int32
+				if d.Headers != nil {
+					if val, ok := d.Headers["retry"]; ok {
+						retry = val.(int32)
+					}
+					if retry > 3 {
+						d.Ack(false)
+						continue
+					}
+				}
+
+				log.Printf("Received a message: %s with retry %d", d.Body, retry)
 				p.executor.Submit(func() {
 					if err := p.processWorkItem(&workItem); err != nil {
-						// log.Printf("failed to process work item: %v", err)
-
-						time.Sleep(2 * time.Second)
-						p.queue.Publish(context.Background(), workItem)
-						return
+						time.Sleep(5 * time.Second)
+						p.queue.Publish(context.Background(), workItem, retry+1)
 					}
+					d.Ack(false)
 
 					p.cache.RemovePending(workItem.ID)
 					p.cache.SetSeq(workItem.URL, workItem.Seq)
@@ -62,6 +69,10 @@ func (p *WebhookProcessor) ProcessWebhooks() {
 			}
 		}()
 	}
+}
+
+func (p *WebhookProcessor) StopWebhooks() {
+	p.executor.Stop()
 }
 
 func (p *WebhookProcessor) processWorkItem(workItem *models.WorkItem) error {
@@ -78,7 +89,7 @@ func (p *WebhookProcessor) processWorkItem(workItem *models.WorkItem) error {
 	p.cache.AddPending(workItem.ID)
 
 	// Simulate work
-	time.Sleep(time.Second)
+	time.Sleep(5 * time.Second)
 
 	resp, err := http.Get(workItem.URL)
 	if err != nil {
