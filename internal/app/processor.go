@@ -26,7 +26,7 @@ func NewWebhookProcessor(storage *SQLiteStorage, queue *queue.RabbitMQQueue, cac
 		storage:  storage,
 		queue:    queue,
 		cache:    cache,
-		executor: executor.NewExecutor(10),
+		executor: executor.NewExecutor(4),
 	}
 }
 
@@ -71,7 +71,7 @@ func (p *WebhookProcessor) ProcessWebhooks() {
 	}
 }
 
-func (p *WebhookProcessor) StopWebhooks() {
+func (p *WebhookProcessor) Stop() {
 	p.executor.Stop()
 }
 

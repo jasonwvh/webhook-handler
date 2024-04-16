@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"log"
 	"sync"
 )
 
@@ -46,6 +47,7 @@ func (e *Executor) worker() {
 		case job := <-e.jobCh:
 			job()
 		case <-e.stopCh:
+			log.Printf("received kill worker signal")
 			return
 		}
 	}
