@@ -3,10 +3,8 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/jasonwvh/webhook-handler/internal/executor"
@@ -66,7 +64,7 @@ func (p *WebhookProcessor) ProcessWebhooks() {
 					d.Ack(false)
 
 					p.cache.RemovePending(workItem.ID)
-					p.cache.SetSeq(workItem.URL, workItem.Seq)
+					// p.cache.SetSeq(workItem.URL, workItem.Seq)
 				})
 			}
 		}()
@@ -78,20 +76,20 @@ func (p *WebhookProcessor) Stop() {
 }
 
 func (p *WebhookProcessor) processWorkItem(workItem *models.WorkItem) error {
-	seq, err := p.cache.GetSeq(workItem.URL)
-	if err != nil {
-		// if url doesn't exist yet, create one
-		p.cache.SetSeq(workItem.URL, workItem.Seq)
-	}
-	seqInt, _ := strconv.Atoi(seq)
-	if err == nil && workItem.Seq != seqInt+1 {
-		// if the url is already processed and it's not the next sequence
-		return fmt.Errorf("work item not next in order")
-	}
+	// seq, err := p.cache.GetSeq(workItem.URL)
+	// if err != nil {
+	// 	// if url doesn't exist yet, create one
+	// 	p.cache.SetSeq(workItem.URL, workItem.Seq)
+	// }
+	// seqInt, _ := strconv.Atoi(seq)
+	// if err == nil && workItem.Seq != seqInt+1 {
+	// 	// if the url is already processed and it's not the next sequence
+	// 	return fmt.Errorf("work item not next in order")
+	// }
 	p.cache.AddPending(workItem.ID)
 
 	// Simulate work
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	resp, err := http.Get(workItem.URL)
 	if err != nil {
