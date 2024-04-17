@@ -1,15 +1,26 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/jasonwvh/webhook-handler/internal/app"
 	"github.com/jasonwvh/webhook-handler/internal/config"
 	"github.com/jasonwvh/webhook-handler/internal/queue"
 )
 
+var signalChan chan (os.Signal) = make(chan os.Signal, 1)
+
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	conf, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
@@ -19,23 +30,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create storage: %v", err)
 	}
-	defer func(storage *app.SQLiteStorage) {
-		err := storage.Close()
-		if err != nil {
-			panic(err)
-		}
-	}(storage)
+	defer storage.Close()
 
 	que, err := queue.NewRabbitMQQueue(conf.RabbitMQHost, conf.RabbitMQUser, conf.RabbitMQPassword)
 	if err != nil {
 		log.Fatalf("failed to create queue: %v", err)
 	}
-	defer func(q *queue.RabbitMQQueue) {
-		err := q.Close()
-		if err != nil {
-			panic(err)
-		}
-	}(que)
+	defer que.Close()
 
 	cache := app.NewRedisClient(conf.RedisHost)
 
@@ -45,9 +46,37 @@ func main() {
 	webhookProcessor := app.NewWebhookProcessor(storage, que, cache)
 	go webhookProcessor.ProcessWebhooks()
 
+	server := &http.Server{
+		Addr: ":8080",
+	}
+
 	http.HandleFunc("/webhook", handler.HandleWebhook)
 	http.HandleFunc("/async-webhook", asyncHandler.HandleWebhook)
+	http.HandleFunc("/terminate", termHandler)
 
-	log.Printf("Starting webhook handler on port 8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	go func() {
+		fmt.Println("Server running on port 8080")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	<-signalChan
+
+	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctxTimeout); err != nil {
+		fmt.Printf("Error during server shutdown: %v\n", err)
+	}
+
+	webhookProcessor.Stop()
+
+	fmt.Println("Server stopped gracefully.")
+}
+
+func termHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "Goodbye World!\n")
+	signalChan <- syscall.SIGTERM
 }

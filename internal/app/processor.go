@@ -3,16 +3,16 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/jasonwvh/webhook-handler/internal/executor"
 	"github.com/jasonwvh/webhook-handler/internal/models"
 	"github.com/jasonwvh/webhook-handler/internal/queue"
 )
+
+const maxRetry int32 = 3
 
 type WebhookProcessor struct {
 	storage  *SQLiteStorage
@@ -26,7 +26,7 @@ func NewWebhookProcessor(storage *SQLiteStorage, queue *queue.RabbitMQQueue, cac
 		storage:  storage,
 		queue:    queue,
 		cache:    cache,
-		executor: executor.NewExecutor(10),
+		executor: executor.NewExecutor(4),
 	}
 }
 
@@ -34,51 +34,62 @@ func (p *WebhookProcessor) ProcessWebhooks() {
 	for {
 		msgs, err := p.queue.Receive(context.Background())
 		if err != nil {
-			log.Printf("failed to receive work item: %v", err)
 			continue
 		}
 
 		go func() {
 			for d := range msgs {
-				// log.Printf("Received a message: %s", d.Body)
-
 				var workItem models.WorkItem
 				if err := json.Unmarshal(d.Body, &workItem); err != nil {
 					continue
 				}
 
+				var retry int32
+				if d.Headers != nil {
+					if val, ok := d.Headers["retry"]; ok {
+						retry = val.(int32)
+					}
+					if retry > maxRetry {
+						d.Ack(false)
+						continue
+					}
+				}
+
+				log.Printf("Received a message: %s with retry %d", d.Body, retry)
 				p.executor.Submit(func() {
 					if err := p.processWorkItem(&workItem); err != nil {
-						// log.Printf("failed to process work item: %v", err)
-
-						time.Sleep(2 * time.Second)
-						p.queue.Publish(context.Background(), workItem)
-						return
+						time.Sleep(5 * time.Second)
+						p.queue.Publish(context.Background(), workItem, retry+1)
 					}
+					d.Ack(false)
 
 					p.cache.RemovePending(workItem.ID)
-					p.cache.SetSeq(workItem.URL, workItem.Seq)
+					// p.cache.SetSeq(workItem.URL, workItem.Seq)
 				})
 			}
 		}()
 	}
 }
 
+func (p *WebhookProcessor) Stop() {
+	p.executor.Stop()
+}
+
 func (p *WebhookProcessor) processWorkItem(workItem *models.WorkItem) error {
-	seq, err := p.cache.GetSeq(workItem.URL)
-	if err != nil {
-		// if url doesn't exist yet, create one
-		p.cache.SetSeq(workItem.URL, workItem.Seq)
-	}
-	seqInt, _ := strconv.Atoi(seq)
-	if err == nil && workItem.Seq != seqInt+1 {
-		// if the url is already processed and it's not the next sequence
-		return fmt.Errorf("work item not next in order")
-	}
+	// seq, err := p.cache.GetSeq(workItem.URL)
+	// if err != nil {
+	// 	// if url doesn't exist yet, create one
+	// 	p.cache.SetSeq(workItem.URL, workItem.Seq)
+	// }
+	// seqInt, _ := strconv.Atoi(seq)
+	// if err == nil && workItem.Seq != seqInt+1 {
+	// 	// if the url is already processed and it's not the next sequence
+	// 	return fmt.Errorf("work item not next in order")
+	// }
 	p.cache.AddPending(workItem.ID)
 
 	// Simulate work
-	time.Sleep(time.Second)
+	time.Sleep(1 * time.Second)
 
 	resp, err := http.Get(workItem.URL)
 	if err != nil {

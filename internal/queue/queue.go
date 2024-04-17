@@ -69,11 +69,14 @@ func NewRabbitMQQueue(host, user, password string) (*RabbitMQQueue, error) {
 	}, nil
 }
 
-func (q *RabbitMQQueue) Publish(ctx context.Context, workItem models.WorkItem) error {
+func (q *RabbitMQQueue) Publish(ctx context.Context, workItem models.WorkItem, retry int32) error {
 	payload, err := json.Marshal(workItem)
 	if err != nil {
 		return err
 	}
+
+	headers := make(amqp091.Table)
+	headers["retry"] = retry
 
 	return q.ch.PublishWithContext(ctx,
 		"",       // exchange
@@ -83,6 +86,7 @@ func (q *RabbitMQQueue) Publish(ctx context.Context, workItem models.WorkItem) e
 		amqp091.Publishing{
 			ContentType: "application/json",
 			Body:        payload,
+			Headers:     headers,
 		})
 }
 
@@ -90,7 +94,7 @@ func (q *RabbitMQQueue) Receive(ctx context.Context) (<-chan amqp091.Delivery, e
 	msgs, err := q.ch.ConsumeWithContext(ctx,
 		q.q.Name, // queue
 		"",       // consumer
-		true,     // auto-ack
+		false,    // auto-ack
 		false,    // exclusive
 		false,    // no-local
 		false,    // no-wait
