@@ -14,6 +14,8 @@ import (
 	"github.com/jasonwvh/webhook-handler/internal/queue"
 )
 
+const maxRetry int32 = 3
+
 type WebhookProcessor struct {
 	storage  *SQLiteStorage
 	queue    *queue.RabbitMQQueue
@@ -49,7 +51,7 @@ func (p *WebhookProcessor) ProcessWebhooks() {
 					if val, ok := d.Headers["retry"]; ok {
 						retry = val.(int32)
 					}
-					if retry > 3 {
+					if retry > maxRetry {
 						d.Ack(false)
 						continue
 					}
