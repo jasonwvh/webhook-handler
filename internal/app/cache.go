@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -24,15 +25,22 @@ func NewRedisClient(host string) *RedisClient {
 }
 
 func (r *RedisClient) AddPending(id int) error {
-	return r.client.SAdd(r.ctx, "pending", id).Err()
+	idStr := strconv.Itoa(id)
+	// return r.client.SAdd(r.ctx, "pending", idStr).Err()
+	return r.client.Set(r.ctx, idStr, "pending", 60*time.Second).Err()
 }
 
 func (r *RedisClient) IsPending(id int) bool {
-	return r.client.SIsMember(r.ctx, "pending", id).Val()
+	idStr := strconv.Itoa(id)
+	// return r.client.SIsMember(r.ctx, "pending", idStr).Val()
+	val := r.client.Get(r.ctx, idStr).Val()
+	return val == "pending"
 }
 
 func (r *RedisClient) RemovePending(id int) error {
-	return r.client.SRem(r.ctx, "pending", id).Err()
+	idStr := strconv.Itoa(id)
+	// return r.client.SRem(r.ctx, "pending", idStr).Err()
+	return r.client.Del(r.ctx, idStr).Err()
 }
 
 func (r *RedisClient) SetSeq(key string, value interface{}) error {
